@@ -3460,7 +3460,7 @@ static void handle_session(struct ceph_mds_session *session,
 	void *end = p + msg->front.iov_len;
 	struct ceph_mds_session_head *h;
 	u32 op;
-	u64 seq, features = 0;
+	u64 seq, features, metric_spec = 0;
 	int wake = 0;
 	bool blocklisted = false;
 
@@ -3472,6 +3472,7 @@ static void handle_session(struct ceph_mds_session *session,
 	op = le32_to_cpu(h->op);
 	seq = le64_to_cpu(h->seq);
 
+        pr_warn("hrk1 mds%d handle_session called msg_version %d sizeof header %lu p %lu\n", session->s_mds, msg_version, sizeof(*h), (long unsigned int)p);
 	if (msg_version >= 3) {
 		u32 len;
 		/* version >= 2, metadata */
@@ -3484,6 +3485,25 @@ static void handle_session(struct ceph_mds_session *session,
 			p += len - sizeof(features);
 		}
 	}
+        pr_warn("hrk2 mds%d handle_session called msg_version %d p %lu\n", session->s_mds, msg_version, (long unsigned int)p);
+
+	blocklisted = false;
+	if (msg_version >= 5) {
+		u32 len;
+		u32 flags;
+		/* version >= 4, metric_spec  */
+                pr_warn("hrk3 mds%d handle_session called msg_version %d p %lu\n", session->s_mds, msg_version, (long unsigned int)p);
+		ceph_decode_64_safe(&p, end, metric_spec, bad);
+		p += sizeof(metric_spec);
+		/* version >= 5, flags   */
+                pr_warn("hrk4 mds%d handle_session called msg_version %d p %lu\n", session->s_mds, msg_version, (long unsigned int)p);
+                ceph_decode_32_safe(&p, end, flags, bad);
+		if (flags & CEPH_SESSION_BLOCKLISTED) {
+		        pr_warn("hrk mds%d blocklisting\n", session->s_mds);
+			blocklisted = true;
+		}
+	}
+	blocklisted = false;
 
 	mutex_lock(&mdsc->mutex);
 	if (op == CEPH_SESSION_CLOSE) {
